@@ -260,18 +260,18 @@ Input text: ${text}`;
               <div className="flex items-center space-x-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Number of Cards (max 30)
+                    Number of Cards (max 50)
                   </label>
                   <input
                     type="number"
                     min="1"
-                    max="30"
+                    max="50"
                     value={cardCountInput}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (
                         val === "" ||
-                        (parseInt(val) >= 1 && parseInt(val) <= 30)
+                        (parseInt(val) >= 1 && parseInt(val) <= 50)
                       ) {
                         setCardCountInput(val);
                       }
@@ -280,8 +280,8 @@ Input text: ${text}`;
                       const num = parseInt(cardCountInput);
                       if (!num || num < 1) {
                         setCardCountInput("1");
-                      } else if (num > 30) {
-                        setCardCountInput("30");
+                      } else if (num > 50) {
+                        setCardCountInput("50");
                       }
                     }}
                     className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
