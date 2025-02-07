@@ -108,8 +108,14 @@ Input text: ${text}`;
       });
       const response = result.response.text();
 
+      // Try to extract JSON if it's wrapped in code blocks
+      const jsonMatch =
+        response.match(/```json\n([\s\S]*)\n```/) ||
+        response.match(/```([\s\S]*)```/);
+      const jsonStr = jsonMatch ? jsonMatch[1] : response;
+
       try {
-        const data = JSON.parse(response.trim());
+        const data = JSON.parse(jsonStr.trim());
         if (!data.cards || !Array.isArray(data.cards)) {
           throw new Error("Invalid response format");
         }
