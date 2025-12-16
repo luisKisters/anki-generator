@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import {
   BookOpen,
   BrainCircuit,
@@ -136,19 +136,17 @@ Input text: ${text}`;
     setError(null);
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = generatePrompt(inputText, cardType);
+
+      const result = await ai.models.generateContent({
         model: "gemini-flash-latest",
-        generationConfig: {
+        contents: prompt,
+        config: {
           temperature: temperature,
         },
       });
-
-      const prompt = generatePrompt(inputText, cardType);
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      });
-      const response = result.response.text();
+      const response = result.text ?? "";
 
       // Try to extract JSON if it's wrapped in code blocks
       const jsonMatch =
