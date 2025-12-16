@@ -1,4 +1,3 @@
-import React from "react";
 import { useState } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
@@ -7,12 +6,51 @@ import {
   Download,
   Eye,
   FileDown,
+  List,
   Loader2,
   Settings,
   SplitSquareHorizontal,
   Square,
+  SquareStack,
   X,
 } from "lucide-react";
+
+type ViewMode = "single" | "list";
+
+type TemperatureStage = {
+  name: string;
+  description: string;
+  color: string;
+};
+
+const getTemperatureStage = (temp: number): TemperatureStage => {
+  if (temp <= 0.2) {
+    return {
+      name: "Precise",
+      description:
+        "Factual, consistent output. Best for definitions and exact facts.",
+      color: "text-blue-600",
+    };
+  } else if (temp <= 0.5) {
+    return {
+      name: "Balanced",
+      description: "Recommended. Good accuracy with variety.",
+      color: "text-green-600",
+    };
+  } else if (temp <= 0.8) {
+    return {
+      name: "Creative",
+      description: "More varied phrasing. Great for language learning.",
+      color: "text-orange-500",
+    };
+  } else {
+    return {
+      name: "Wild",
+      description: "Experimental, may surprise you.",
+      color: "text-red-500",
+    };
+  }
+};
 
 type CardType = "basic" | "cloze";
 type Card = {
@@ -32,6 +70,11 @@ function App() {
   const [apiKey, setApiKey] = useState(
     () => localStorage.getItem("geminiApiKey") || ""
   );
+  const [temperature, setTemperature] = useState(() => {
+    const saved = localStorage.getItem("temperature");
+    return saved ? parseFloat(saved) : 0.3;
+  });
+  const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [error, setError] = useState<string | null>(null);
 
   const saveApiKey = (key: string) => {
@@ -40,14 +83,9 @@ function App() {
     setShowSettings(false);
   };
 
-  const extractCount = (text: string): [string, number] => {
-    const match = text.match(/(\d+)x\s*$/);
-    if (match) {
-      const count = parseInt(match[1]);
-      const cleanText = text.replace(/\s*\d+x\s*$/, "").trim();
-      return [cleanText, count];
-    }
-    return [text, 3]; // Default to 3 cards if no count specified
+  const handleTemperatureChange = (value: number) => {
+    setTemperature(value);
+    localStorage.setItem("temperature", value.toString());
   };
 
   const generatePrompt = (text: string, type: CardType) => {
@@ -60,8 +98,8 @@ The output must be in this exact JSON format, with no additional text:
   "cards": [
     ${
       type === "basic"
-        ? '{"front": "What is the capital of France?", "back": "Paris"}'
-        : '{"text": "Ayer {{c1::fui}} al cine. (ir)"}'
+        ? '{"front": "What is the <b>capital</b> of France?", "back": "<b>Paris</b>"}'
+        : '{"text": "Ayer {{c1::<b>fui</b>}} al cine. <i>(ir)</i>"}'
     }
   ]
 }
@@ -76,6 +114,11 @@ Rules:
         ? "Make questions clear and answers concise"
         : "For conjugation cards:\n   - Use {{c1::term}} for cloze deletions\n   - Always include infinitive in parentheses\n   - Focus on actual usage examples"
     }
+6. Use HTML formatting to enhance readability (Anki supports HTML):
+   - <b>bold</b> for key terms and important words
+   - <i>italic</i> for emphasis, translations, or hints
+   - <br> for line breaks when needed
+   - Keep formatting minimal but meaningful
 
 Input text: ${text}`;
 
@@ -97,7 +140,7 @@ Input text: ${text}`;
       const model = genAI.getGenerativeModel({
         model: "gemini-flash-latest",
         generationConfig: {
-          temperature: 0.2,
+          temperature: temperature,
         },
       });
 
@@ -187,7 +230,7 @@ Input text: ${text}`;
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="mb-4">
+                <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Gemini API Key
                   </label>
@@ -210,6 +253,60 @@ Input text: ${text}`;
                     </a>
                   </p>
                 </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Creativity (Temperature):{" "}
+                    <span className={getTemperatureStage(temperature).color}>
+                      {getTemperatureStage(temperature).name}
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={temperature}
+                    onChange={(e) =>
+                      handleTemperatureChange(parseFloat(e.target.value))
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <p className="mt-2 text-sm text-gray-600">
+                    {getTemperatureStage(temperature).description}
+                  </p>
+                  <div className="mt-3 space-y-1 text-xs text-gray-500">
+                    <div className="flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>
+                      <span>
+                        <strong>Precise (0.0-0.2)</strong>: Best for definitions
+                        and exact facts
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-green-600 mr-2"></span>
+                      <span>
+                        <strong>Balanced (0.3-0.5)</strong>: Recommended for
+                        most cards
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-orange-500 mr-2"></span>
+                      <span>
+                        <strong>Creative (0.6-0.8)</strong>: Great for language
+                        learning
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
+                      <span>
+                        <strong>Wild (0.9-1.0)</strong>: Experimental, may
+                        surprise you
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   onClick={() => saveApiKey(apiKey)}
                   className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
@@ -256,8 +353,8 @@ Input text: ${text}`;
 
             {/* Text Input */}
             <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Number of Cards (max 50)
                   </label>
@@ -285,6 +382,29 @@ Input text: ${text}`;
                     }}
                     className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Creativity:{" "}
+                    <span className={getTemperatureStage(temperature).color}>
+                      {getTemperatureStage(temperature).name}
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={temperature}
+                    onChange={(e) =>
+                      handleTemperatureChange(parseFloat(e.target.value))
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>Precise</span>
+                    <span>Wild</span>
+                  </div>
                 </div>
               </div>
               <div>
@@ -322,72 +442,180 @@ Input text: ${text}`;
                   <Eye className="w-5 h-5 mr-2" />
                   Preview Cards
                 </h2>
-                <div className="text-sm text-gray-500">
-                  {currentCardIndex + 1} of {generatedCards.length}
+                <div className="flex items-center space-x-4">
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setViewMode("single")}
+                      className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        viewMode === "single"
+                          ? "bg-white text-indigo-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                      title="Single card view"
+                    >
+                      <SquareStack className="w-4 h-4 mr-1" />
+                      Single
+                    </button>
+                    <button
+                      onClick={() => setViewMode("list")}
+                      className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        viewMode === "list"
+                          ? "bg-white text-indigo-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                      title="All cards view"
+                    >
+                      <List className="w-4 h-4 mr-1" />
+                      All
+                    </button>
+                  </div>
+                  {viewMode === "single" && (
+                    <div className="text-sm text-gray-500">
+                      {currentCardIndex + 1} of {generatedCards.length}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="min-h-[200px] bg-gray-50 rounded-lg p-6 mb-6">
-                {cardType === "basic" ? (
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-2">
-                        Front
-                      </h3>
-                      <p className="text-lg text-gray-900">
-                        {generatedCards[currentCardIndex].front}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-2">
-                        Back
-                      </h3>
-                      <p className="text-lg text-gray-900">
-                        {generatedCards[currentCardIndex].back}
-                      </p>
-                    </div>
+              {viewMode === "single" ? (
+                <>
+                  <div className="min-h-[200px] bg-gray-50 rounded-lg p-6 mb-6">
+                    {cardType === "basic" ? (
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">
+                            Front
+                          </h3>
+                          <div
+                            className="text-lg text-gray-900"
+                            dangerouslySetInnerHTML={{
+                              __html:
+                                generatedCards[currentCardIndex].front || "",
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 mb-2">
+                            Back
+                          </h3>
+                          <div
+                            className="text-lg text-gray-900"
+                            dangerouslySetInnerHTML={{
+                              __html:
+                                generatedCards[currentCardIndex].back || "",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500 mb-2">
+                          Cloze
+                        </h3>
+                        <div
+                          className="text-lg text-gray-900"
+                          dangerouslySetInnerHTML={{
+                            __html: generatedCards[currentCardIndex].text || "",
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">
-                      Cloze
-                    </h3>
-                    <p className="text-lg text-gray-900">
-                      {generatedCards[currentCardIndex].text}
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              <div className="flex justify-between items-center">
-                <button
-                  onClick={() =>
-                    setCurrentCardIndex((prev) => Math.max(0, prev - 1))
-                  }
-                  disabled={currentCardIndex === 0}
-                  className="py-2 px-4 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={downloadCSV}
-                  className="py-2 px-6 bg-green-600 text-white rounded-lg flex items-center space-x-2 hover:bg-green-700 transition-colors"
-                >
-                  <FileDown className="w-5 h-5" />
-                  <span>Download CSV</span>
-                </button>
-                <button
-                  onClick={() =>
-                    setCurrentCardIndex((prev) =>
-                      Math.min(generatedCards.length - 1, prev + 1)
-                    )
-                  }
-                  disabled={currentCardIndex === generatedCards.length - 1}
-                  className="py-2 px-4 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+                  <div className="flex justify-between items-center">
+                    <button
+                      onClick={() =>
+                        setCurrentCardIndex((prev) => Math.max(0, prev - 1))
+                      }
+                      disabled={currentCardIndex === 0}
+                      className="py-2 px-4 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={downloadCSV}
+                      className="py-2 px-6 bg-green-600 text-white rounded-lg flex items-center space-x-2 hover:bg-green-700 transition-colors"
+                    >
+                      <FileDown className="w-5 h-5" />
+                      <span>Download CSV</span>
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCurrentCardIndex((prev) =>
+                          Math.min(generatedCards.length - 1, prev + 1)
+                        )
+                      }
+                      disabled={currentCardIndex === generatedCards.length - 1}
+                      className="py-2 px-4 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="max-h-[400px] overflow-y-auto space-y-3 mb-6">
+                    {generatedCards.map((card, index) => (
+                      <div
+                        key={index}
+                        className="bg-gray-50 rounded-lg p-4 border border-gray-100"
+                      >
+                        <div className="text-xs font-medium text-indigo-600 mb-2">
+                          Card {index + 1}
+                        </div>
+                        {cardType === "basic" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <h4 className="text-xs font-medium text-gray-400 uppercase mb-1">
+                                Front
+                              </h4>
+                              <div
+                                className="text-gray-900"
+                                dangerouslySetInnerHTML={{
+                                  __html: card.front || "",
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-medium text-gray-400 uppercase mb-1">
+                                Back
+                              </h4>
+                              <div
+                                className="text-gray-900"
+                                dangerouslySetInnerHTML={{
+                                  __html: card.back || "",
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <h4 className="text-xs font-medium text-gray-400 uppercase mb-1">
+                              Cloze
+                            </h4>
+                            <div
+                              className="text-gray-900"
+                              dangerouslySetInnerHTML={{
+                                __html: card.text || "",
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-center">
+                    <button
+                      onClick={downloadCSV}
+                      className="py-2 px-6 bg-green-600 text-white rounded-lg flex items-center space-x-2 hover:bg-green-700 transition-colors"
+                    >
+                      <FileDown className="w-5 h-5" />
+                      <span>Download CSV</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
