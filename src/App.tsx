@@ -95,10 +95,9 @@ Input text: ${text}`;
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash-001",
+        model: "gemini-flash-latest",
         generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048,
+          temperature: 0.2,
         },
       });
 
