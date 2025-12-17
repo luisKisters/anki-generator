@@ -1,21 +1,26 @@
 import { useState } from "react";
 import { GoogleGenAI } from "@google/genai";
+import { motion, AnimatePresence } from "motion/react";
 import {
-  BookOpen,
-  BrainCircuit,
+  ChevronLeft,
+  ChevronRight,
   Download,
-  Eye,
-  FileDown,
-  List,
   Loader2,
+  RefreshCw,
+  Send,
   Settings,
-  SplitSquareHorizontal,
-  Square,
-  SquareStack,
+  Sparkles,
   X,
+  Zap,
 } from "lucide-react";
 
-type ViewMode = "single" | "list";
+type CardType = "basic" | "cloze";
+type AppState = "initial" | "generated" | "downloaded";
+type Card = {
+  front?: string;
+  back?: string;
+  text?: string;
+};
 
 type TemperatureStage = {
   name: string;
@@ -27,45 +32,44 @@ const getTemperatureStage = (temp: number): TemperatureStage => {
   if (temp <= 0.2) {
     return {
       name: "Precise",
-      description:
-        "Factual, consistent output. Best for definitions and exact facts.",
-      color: "text-blue-600",
+      description: "Factual, consistent output",
+      color: "text-cyan-400",
     };
   } else if (temp <= 0.5) {
     return {
       name: "Balanced",
-      description: "Recommended. Good accuracy with variety.",
-      color: "text-green-600",
+      description: "Recommended setting",
+      color: "text-emerald-400",
     };
   } else if (temp <= 0.8) {
     return {
       name: "Creative",
-      description: "More varied phrasing. Great for language learning.",
-      color: "text-orange-500",
+      description: "More variety",
+      color: "text-amber-400",
     };
   } else {
     return {
       name: "Wild",
-      description: "Experimental, may surprise you.",
-      color: "text-red-500",
+      description: "Experimental",
+      color: "text-red-400",
     };
   }
 };
 
-type CardType = "basic" | "cloze";
-type Card = {
-  front?: string;
-  back?: string;
-  text?: string;
-};
-
 function App() {
+  // Core state
   const [cardType, setCardType] = useState<CardType>("basic");
   const [inputText, setInputText] = useState("");
-  const [cardCountInput, setCardCountInput] = useState<string>("3");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [suggestedChanges, setSuggestedChanges] = useState("");
   const [generatedCards, setGeneratedCards] = useState<Card[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [appState, setAppState] = useState<AppState>("initial");
+
+  // Card count state
+  const [cardCountInput, setCardCountInput] = useState<number>(5);
+  const [autoCardCount, setAutoCardCount] = useState(false);
+
+  // Settings state
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(
     () => localStorage.getItem("geminiApiKey") || ""
@@ -74,7 +78,9 @@ function App() {
     const saved = localStorage.getItem("temperature");
     return saved ? parseFloat(saved) : 0.3;
   });
-  const [viewMode, setViewMode] = useState<ViewMode>("single");
+
+  // UI state
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const saveApiKey = (key: string) => {
@@ -88,44 +94,44 @@ function App() {
     localStorage.setItem("temperature", value.toString());
   };
 
-  const generatePrompt = (text: string, type: CardType) => {
-    const count = parseInt(cardCountInput) || 3;
+  const generatePrompt = (text: string, type: CardType, changes?: string) => {
+    const count = autoCardCount ? "an appropriate number of" : cardCountInput;
+    const changesSection = changes
+      ? `\n\nUser requested modifications:\n${changes}`
+      : "";
 
-    const basePrompt = `You are a flashcard generator that ONLY outputs valid JSON. Create ${count} flashcards from this text.
+    const basePrompt = `You are an expert flashcard generator. Create ${count} high-quality Anki flashcards from the provided text.${changesSection}
 
-The output must be in this exact JSON format, with no additional text:
+Output ONLY valid JSON in this exact format:
 {
   "cards": [
     ${
       type === "basic"
-        ? '{"front": "What is the <b>capital</b> of France?", "back": "<b>Paris</b>"}'
-        : '{"text": "Ayer {{c1::<b>fui</b>}} al cine. <i>(ir)</i>"}'
+        ? '{"front": "Question with <b>key terms</b> highlighted?", "back": "<b>Answer</b> with important details"}'
+        : '{"text": "Example sentence with {{c1::<b>cloze deletion</b>}} for key concept"}'
     }
   ]
 }
 
-Rules:
-1. Output ONLY valid JSON, nothing else
-2. Create exactly ${count} cards
-3. Use the same language as the input text
-4. Create practical examples, not theory
+Guidelines:
+1. Output ONLY valid JSON - no explanations or markdown
+2. ${autoCardCount ? "Create a realistic number of cards based on content density (typically 3-15)" : `Create exactly ${cardCountInput} cards`}
+3. Match the language of the input text
+4. Focus on practical, memorable content
 5. ${
       type === "basic"
-        ? "Make questions clear and answers concise"
-        : "For conjugation cards:\n   - Use {{c1::term}} for cloze deletions\n   - Always include infinitive in parentheses\n   - Focus on actual usage examples"
+        ? "Make questions specific and answers concise"
+        : "Use {{c1::term}} syntax for cloze deletions, include context"
     }
-6. Use HTML formatting to enhance readability (Anki supports HTML):
-   - <b>bold</b> for key terms and important words
-   - <i>italic</i> for emphasis, translations, or hints
-   - <br> for line breaks when needed
-   - Keep formatting minimal but meaningful
+6. Use HTML formatting sparingly: <b>bold</b> for key terms, <i>italic</i> for hints
 
-Input text: ${text}`;
+Input text:
+${text}`;
 
     return basePrompt;
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (isApplyChanges = false) => {
     if (!apiKey) {
       setError("Please set your Gemini API key in settings first");
       setShowSettings(true);
@@ -137,10 +143,14 @@ Input text: ${text}`;
 
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const prompt = generatePrompt(inputText, cardType);
+      const prompt = generatePrompt(
+        inputText,
+        cardType,
+        isApplyChanges ? suggestedChanges : undefined
+      );
 
       const result = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           temperature: temperature,
@@ -148,7 +158,6 @@ Input text: ${text}`;
       });
       const response = result.text ?? "";
 
-      // Try to extract JSON if it's wrapped in code blocks
       const jsonMatch =
         response.match(/```json\n([\s\S]*)\n```/) ||
         response.match(/```([\s\S]*)```/);
@@ -160,7 +169,9 @@ Input text: ${text}`;
           throw new Error("Invalid response format");
         }
         setGeneratedCards(data.cards);
-      } catch (e) {
+        setCurrentCardIndex(0);
+        setAppState("generated");
+      } catch {
         console.error("Raw response:", response);
         throw new Error("Failed to parse AI response");
       }
@@ -189,354 +200,318 @@ Input text: ${text}`;
     a.href = url;
     a.download = "anki-cards.csv";
     a.click();
+    setAppState("downloaded");
   };
 
+  const handleRestart = () => {
+    setGeneratedCards([]);
+    setCurrentCardIndex(0);
+    setAppState("initial");
+    setInputText("");
+    setSuggestedChanges("");
+    setError(null);
+  };
+
+  const currentCard = generatedCards[currentCardIndex];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center mb-4">
-              <BrainCircuit className="w-12 h-12 text-indigo-600" />
-              <button
-                onClick={() => setShowSettings(true)}
-                className="absolute top-4 right-4 p-2 text-gray-600 hover:text-indigo-600 transition-colors"
-                title="Settings"
-              >
-                <Settings className="w-6 h-6" />
-              </button>
-            </div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              AI Flashcard Generator
-            </h1>
-            <p className="text-lg text-gray-600">
-              Transform any text into Anki flashcards with AI assistance
-            </p>
+    <div className="min-h-screen bg-void bg-grid-pattern">
+      {/* Header */}
+      <header className="border-b border-primary/30 bg-void-light/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Zap className="w-8 h-8 text-primary-bright" />
+            <h1 className="header-title">Anki Generator</h1>
           </div>
+          <div className="flex items-center gap-4">
+            <span className="status-indicator active">
+              <span className="mono text-xs">SYSTEM ONLINE</span>
+            </span>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-text-muted hover:text-primary-bright transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </header>
 
-          {/* Settings Modal */}
-          {showSettings && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold">Settings</h2>
-                  <button
-                    onClick={() => setShowSettings(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gemini API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="Enter your API key"
-                  />
-                  <p className="mt-2 text-sm text-gray-600">
-                    Get your API key from{" "}
-                    <a
-                      href="https://aistudio.google.com/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-800 underline"
-                    >
-                      Google AI Studio
-                    </a>
-                  </p>
-                </div>
+      {/* Main Content - Two Panel Layout */}
+      <main className="max-w-7xl mx-auto p-6 h-[calc(100vh-73px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+          {/* Left Panel - Controls */}
+          <div className="panel p-6 flex flex-col corner-brackets">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-text uppercase tracking-wider">
+                Configuration
+              </h2>
+              <span className="mono text-xs text-text-dim">CTRL_PANEL</span>
+            </div>
 
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Creativity (Temperature):{" "}
-                    <span className={getTemperatureStage(temperature).color}>
-                      {getTemperatureStage(temperature).name}
-                    </span>
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={temperature}
-                    onChange={(e) =>
-                      handleTemperatureChange(parseFloat(e.target.value))
-                    }
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                  />
-                  <p className="mt-2 text-sm text-gray-600">
-                    {getTemperatureStage(temperature).description}
-                  </p>
-                  <div className="mt-3 space-y-1 text-xs text-gray-500">
-                    <div className="flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>
-                      <span>
-                        <strong>Precise (0.0-0.2)</strong>: Best for definitions
-                        and exact facts
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-green-600 mr-2"></span>
-                      <span>
-                        <strong>Balanced (0.3-0.5)</strong>: Recommended for
-                        most cards
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-orange-500 mr-2"></span>
-                      <span>
-                        <strong>Creative (0.6-0.8)</strong>: Great for language
-                        learning
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
-                      <span>
-                        <strong>Wild (0.9-1.0)</strong>: Experimental, may
-                        surprise you
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
+            {/* Card Type Selection */}
+            <div className="mb-6">
+              <label className="label">Card Type</label>
+              <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => saveApiKey(apiKey)}
-                  className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                  onClick={() => setCardType("basic")}
+                  className={`p-4 rounded border transition-all ${
+                    cardType === "basic"
+                      ? "border-primary bg-primary/20 text-primary-bright"
+                      : "border-border bg-void hover:border-primary/50 text-text-muted"
+                  }`}
                 >
-                  Save Settings
+                  <span className="block font-semibold">Basic</span>
+                  <span className="text-xs opacity-70">Front / Back</span>
+                </button>
+                <button
+                  onClick={() => setCardType("cloze")}
+                  className={`p-4 rounded border transition-all ${
+                    cardType === "cloze"
+                      ? "border-primary bg-primary/20 text-primary-bright"
+                      : "border-border bg-void hover:border-primary/50 text-text-muted"
+                  }`}
+                >
+                  <span className="block font-semibold">Cloze</span>
+                  <span className="text-xs opacity-70">Fill in blank</span>
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-              {error}
-            </div>
-          )}
+            {/* Card Count */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <label className="label mb-0">Card Amount</label>
+                <button
+                  onClick={() => setAutoCardCount(!autoCardCount)}
+                  className={`flex items-center gap-2 text-xs uppercase tracking-wider transition-colors ${
+                    autoCardCount ? "text-accent" : "text-text-muted"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Auto</span>
+                  <div
+                    className={`toggle-switch ${autoCardCount ? "active" : ""}`}
+                  />
+                </button>
+              </div>
 
-          {/* Card Type Selection */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <div className="flex space-x-4 mb-6">
-              <button
-                onClick={() => setCardType("basic")}
-                className={`flex-1 py-4 px-6 rounded-lg flex items-center justify-center space-x-2 transition-all ${
-                  cardType === "basic"
-                    ? "bg-indigo-600 text-white shadow-lg"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <SplitSquareHorizontal className="w-5 h-5" />
-                <span>Basic Cards</span>
-              </button>
-              <button
-                onClick={() => setCardType("cloze")}
-                className={`flex-1 py-4 px-6 rounded-lg flex items-center justify-center space-x-2 transition-all ${
-                  cardType === "cloze"
-                    ? "bg-indigo-600 text-white shadow-lg"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <Square className="w-5 h-5" />
-                <span>Cloze Cards</span>
-              </button>
-            </div>
-
-            {/* Text Input */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Number of Cards (max 50)
-                  </label>
+              {!autoCardCount ? (
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={cardCountInput}
+                    onChange={(e) =>
+                      setCardCountInput(parseInt(e.target.value))
+                    }
+                    className="flex-1"
+                  />
                   <input
                     type="number"
                     min="1"
                     max="50"
                     value={cardCountInput}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      if (
-                        val === "" ||
-                        (parseInt(val) >= 1 && parseInt(val) <= 50)
-                      ) {
+                      const val = parseInt(e.target.value);
+                      if (val >= 1 && val <= 50) {
                         setCardCountInput(val);
                       }
                     }}
-                    onBlur={() => {
-                      const num = parseInt(cardCountInput);
-                      if (!num || num < 1) {
-                        setCardCountInput("1");
-                      } else if (num > 50) {
-                        setCardCountInput("50");
-                      }
-                    }}
-                    className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="input-field w-20 text-center"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Creativity:{" "}
-                    <span className={getTemperatureStage(temperature).color}>
-                      {getTemperatureStage(temperature).name}
-                    </span>
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={temperature}
-                    onChange={(e) =>
-                      handleTemperatureChange(parseFloat(e.target.value))
-                    }
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                  />
-                  <div className="flex justify-between text-xs text-gray-400 mt-1">
-                    <span>Precise</span>
-                    <span>Wild</span>
-                  </div>
+              ) : (
+                <div className="p-3 bg-accent/10 border border-accent/30 rounded text-accent text-sm">
+                  <Sparkles className="w-4 h-4 inline mr-2" />
+                  AI will determine optimal card count
                 </div>
+              )}
+            </div>
+
+            {/* Temperature */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <label className="label mb-0">Creativity</label>
+                <span
+                  className={`mono text-xs ${
+                    getTemperatureStage(temperature).color
+                  }`}
+                >
+                  {getTemperatureStage(temperature).name}
+                </span>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Input Text
-                </label>
-                <textarea
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Enter your text here..."
-                  className="w-full h-40 p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={temperature}
+                onChange={(e) =>
+                  handleTemperatureChange(parseFloat(e.target.value))
+                }
+                className="w-full"
+              />
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-text-dim">Precise</span>
+                <span className="text-xs text-text-dim">Wild</span>
               </div>
             </div>
 
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || !inputText.trim()}
-              className="w-full mt-4 py-3 px-6 bg-indigo-600 text-white rounded-lg flex items-center justify-center space-x-2 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+            {/* Input Text */}
+            <div className="flex-1 flex flex-col mb-6">
+              <label className="label">Source Material</label>
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Paste your text here..."
+                className="input-field flex-1 resize-none min-h-[120px]"
+              />
+            </div>
+
+            {/* Suggested Changes (visible after generation) */}
+            {appState !== "initial" && (
+              <div className="mb-6">
+                <label className="label">Suggest Changes</label>
+                <textarea
+                  value={suggestedChanges}
+                  onChange={(e) => setSuggestedChanges(e.target.value)}
+                  placeholder="E.g., 'Make questions harder' or 'Focus on dates'"
+                  className="input-field w-full h-20 resize-none"
+                />
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="mt-auto">
+              {appState === "initial" ? (
+                <button
+                  onClick={() => handleGenerate(false)}
+                  disabled={isGenerating || !inputText.trim()}
+                  className="btn-primary w-full flex items-center justify-center gap-2"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                  <span>{isGenerating ? "Generating..." : "Generate"}</span>
+                </button>
               ) : (
-                <BrainCircuit className="w-5 h-5" />
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleGenerate(true)}
+                    disabled={isGenerating}
+                    className="btn-primary flex items-center justify-center gap-2"
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-5 h-5" />
+                    )}
+                    <span>Apply</span>
+                  </button>
+                  <button
+                    onClick={handleRestart}
+                    className="btn-secondary flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    <span>Restart</span>
+                  </button>
+                </div>
               )}
-              <span>{isGenerating ? "Generating..." : "Generate Cards"}</span>
-            </button>
+            </div>
           </div>
 
-          {/* Card Preview */}
-          {generatedCards.length > 0 && (
-            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <Eye className="w-5 h-5 mr-2" />
-                  Preview Cards
-                </h2>
-                <div className="flex items-center space-x-4">
-                  <div className="flex bg-gray-100 rounded-lg p-1">
-                    <button
-                      onClick={() => setViewMode("single")}
-                      className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                        viewMode === "single"
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                      title="Single card view"
-                    >
-                      <SquareStack className="w-4 h-4 mr-1" />
-                      Single
-                    </button>
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                        viewMode === "list"
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                      title="All cards view"
-                    >
-                      <List className="w-4 h-4 mr-1" />
-                      All
-                    </button>
-                  </div>
-                  {viewMode === "single" && (
-                    <div className="text-sm text-gray-500">
-                      {currentCardIndex + 1} of {generatedCards.length}
-                    </div>
-                  )}
-                </div>
-              </div>
+          {/* Right Panel - Preview */}
+          <div className="panel p-6 flex flex-col corner-brackets">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-text uppercase tracking-wider">
+                Card Preview
+              </h2>
+              <span className="mono text-xs text-text-dim">
+                {generatedCards.length > 0
+                  ? `${currentCardIndex + 1}/${generatedCards.length}`
+                  : "NO_DATA"}
+              </span>
+            </div>
 
-              {viewMode === "single" ? (
-                <>
-                  <div className="min-h-[200px] bg-gray-50 rounded-lg p-6 mb-6">
+            {/* Card Display */}
+            <div className="flex-1 flex flex-col">
+              {generatedCards.length > 0 && currentCard ? (
+                <div className="flex-1 flex flex-col">
+                  {/* Card Content */}
+                  <div className="card-preview flex-1 p-6 scan-lines">
                     {cardType === "basic" ? (
-                      <div className="space-y-4">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-500 mb-2">
-                            Front
-                          </h3>
+                      <div className="space-y-6 h-full flex flex-col">
+                        <div className="flex-1">
+                          <div className="label text-accent">Front</div>
                           <div
-                            className="text-lg text-gray-900"
+                            className="text-lg text-text leading-relaxed"
                             dangerouslySetInnerHTML={{
-                              __html:
-                                generatedCards[currentCardIndex].front || "",
+                              __html: currentCard.front || "",
                             }}
                           />
                         </div>
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-500 mb-2">
-                            Back
-                          </h3>
+                        <div className="divider" />
+                        <div className="flex-1">
+                          <div className="label text-primary-bright">Back</div>
                           <div
-                            className="text-lg text-gray-900"
+                            className="text-lg text-text leading-relaxed"
                             dangerouslySetInnerHTML={{
-                              __html:
-                                generatedCards[currentCardIndex].back || "",
+                              __html: currentCard.back || "",
                             }}
                           />
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">
-                          Cloze
-                        </h3>
+                        <div className="label text-accent">Cloze</div>
                         <div
-                          className="text-lg text-gray-900"
+                          className="text-lg text-text leading-relaxed"
                           dangerouslySetInnerHTML={{
-                            __html: generatedCards[currentCardIndex].text || "",
+                            __html: currentCard.text || "",
                           }}
                         />
                       </div>
                     )}
                   </div>
 
-                  <div className="flex justify-between items-center">
+                  {/* Navigation */}
+                  <div className="flex items-center justify-between mt-4">
                     <button
                       onClick={() =>
                         setCurrentCardIndex((prev) => Math.max(0, prev - 1))
                       }
                       disabled={currentCardIndex === 0}
-                      className="py-2 px-4 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn-secondary px-4 py-2 flex items-center gap-2 disabled:opacity-30"
                     >
-                      Previous
+                      <ChevronLeft className="w-5 h-5" />
+                      <span className="hidden sm:inline">Prev</span>
                     </button>
-                    <button
-                      onClick={downloadCSV}
-                      className="py-2 px-6 bg-green-600 text-white rounded-lg flex items-center space-x-2 hover:bg-green-700 transition-colors"
-                    >
-                      <FileDown className="w-5 h-5" />
-                      <span>Download CSV</span>
-                    </button>
+
+                    <div className="flex gap-1">
+                      {generatedCards.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentCardIndex(idx)}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            idx === currentCardIndex
+                              ? "bg-primary-bright w-6"
+                              : "bg-surface-light hover:bg-primary/50"
+                          }`}
+                        />
+                      ))}
+                    </div>
+
                     <button
                       onClick={() =>
                         setCurrentCardIndex((prev) =>
@@ -544,107 +519,130 @@ Input text: ${text}`;
                         )
                       }
                       disabled={currentCardIndex === generatedCards.length - 1}
-                      className="py-2 px-4 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn-secondary px-4 py-2 flex items-center gap-2 disabled:opacity-30"
                     >
-                      Next
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRight className="w-5 h-5" />
                     </button>
                   </div>
-                </>
+                </div>
               ) : (
-                <>
-                  <div className="max-h-[400px] overflow-y-auto space-y-3 mb-6">
-                    {generatedCards.map((card, index) => (
-                      <div
-                        key={index}
-                        className="bg-gray-50 rounded-lg p-4 border border-gray-100"
-                      >
-                        <div className="text-xs font-medium text-indigo-600 mb-2">
-                          Card {index + 1}
-                        </div>
-                        {cardType === "basic" ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <h4 className="text-xs font-medium text-gray-400 uppercase mb-1">
-                                Front
-                              </h4>
-                              <div
-                                className="text-gray-900"
-                                dangerouslySetInnerHTML={{
-                                  __html: card.front || "",
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-xs font-medium text-gray-400 uppercase mb-1">
-                                Back
-                              </h4>
-                              <div
-                                className="text-gray-900"
-                                dangerouslySetInnerHTML={{
-                                  __html: card.back || "",
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <h4 className="text-xs font-medium text-gray-400 uppercase mb-1">
-                              Cloze
-                            </h4>
-                            <div
-                              className="text-gray-900"
-                              dangerouslySetInnerHTML={{
-                                __html: card.text || "",
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center text-text-dim">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full border-2 border-dashed border-border flex items-center justify-center">
+                      <Zap className="w-8 h-8 opacity-30" />
+                    </div>
+                    <p className="mono text-sm">AWAITING INPUT</p>
+                    <p className="text-xs mt-2 opacity-50">
+                      Generate cards to preview
+                    </p>
                   </div>
-
-                  <div className="flex justify-center">
-                    <button
-                      onClick={downloadCSV}
-                      className="py-2 px-6 bg-green-600 text-white rounded-lg flex items-center space-x-2 hover:bg-green-700 transition-colors"
-                    >
-                      <FileDown className="w-5 h-5" />
-                      <span>Download CSV</span>
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
             </div>
-          )}
 
-          {/* Features */}
-          <div className="grid md:grid-cols-3 gap-6 text-center">
-            <div className="p-6 bg-white rounded-lg shadow-lg">
-              <BookOpen className="w-8 h-8 text-indigo-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                Basic & Cloze Cards
-              </h3>
-              <p className="text-gray-600">
-                Create both traditional and fill-in-the-blank style flashcards
-              </p>
-            </div>
-            <div className="p-6 bg-white rounded-lg shadow-lg">
-              <BrainCircuit className="w-8 h-8 text-indigo-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">AI-Powered</h3>
-              <p className="text-gray-600">
-                Smart generation of cards from any text input
-              </p>
-            </div>
-            <div className="p-6 bg-white rounded-lg shadow-lg">
-              <Download className="w-8 h-8 text-indigo-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Anki Compatible</h3>
-              <p className="text-gray-600">
-                Export your cards directly to Anki-compatible CSV format
-              </p>
+            {/* Download Button */}
+            <div className="mt-6">
+              {appState === "initial" ? (
+                <button
+                  disabled
+                  className="btn-accent w-full flex items-center justify-center gap-2 opacity-30 cursor-not-allowed"
+                >
+                  <Download className="w-5 h-5" />
+                  <span>Download CSV</span>
+                </button>
+              ) : appState === "generated" ? (
+                <button
+                  onClick={downloadCSV}
+                  className="btn-accent w-full flex items-center justify-center gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  <span>Download CSV</span>
+                </button>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={downloadCSV}
+                    className="btn-accent flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    <span>Again</span>
+                  </button>
+                  <button
+                    onClick={handleRestart}
+                    className="btn-secondary flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    <span>Restart</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </div>
+      </main>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowSettings(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="panel p-6 max-w-md w-full corner-brackets"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold uppercase tracking-wider">
+                  Settings
+                </h2>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="text-text-muted hover:text-text transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <label className="label">Gemini API Key</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="Enter your API key"
+                />
+                <p className="mt-2 text-sm text-text-dim">
+                  Get your API key from{" "}
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-bright hover:underline"
+                  >
+                    Google AI Studio
+                  </a>
+                </p>
+              </div>
+
+              <button
+                onClick={() => saveApiKey(apiKey)}
+                className="btn-primary w-full"
+              >
+                Save Settings
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
