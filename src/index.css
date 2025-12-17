@@ -1,3 +1,496 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Primary Colors */
+  --color-void: #0a0a0f;
+  --color-void-light: #12121a;
+  --color-surface: #1a1a24;
+  --color-surface-light: #242432;
+  
+  /* Accent Colors */
+  --color-primary: #7c3aed;
+  --color-primary-bright: #a855f7;
+  --color-primary-glow: rgba(168, 85, 247, 0.4);
+  --color-accent: #22d3ee;
+  --color-accent-glow: rgba(34, 211, 238, 0.3);
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  
+  /* Text Colors */
+  --color-text: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-text-dim: #64748b;
+  
+  /* Border Colors */
+  --color-border: rgba(124, 58, 237, 0.3);
+  --color-border-bright: rgba(168, 85, 247, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Rajdhani', sans-serif;
+  background: var(--color-void);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Geometric Background Pattern */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(rgba(124, 58, 237, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Scan Line Effect */
+.scan-lines {
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-lines::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 4px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Corner Brackets */
+.corner-brackets {
+  position: relative;
+}
+
+.corner-brackets::before,
+.corner-brackets::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: var(--color-primary);
+  pointer-events: none;
+}
+
+.corner-brackets::before {
+  top: 0;
+  left: 0;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.corner-brackets::after {
+  bottom: 0;
+  right: 0;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+
+/* Additional corner brackets via pseudo-elements wrapper */
+.corner-brackets-full {
+  position: relative;
+}
+
+.corner-brackets-full > .bracket-tr,
+.corner-brackets-full > .bracket-bl {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: var(--color-primary);
+  pointer-events: none;
+}
+
+.corner-brackets-full > .bracket-tr {
+  top: 0;
+  right: 0;
+  border-top: 2px solid;
+  border-right: 2px solid;
+}
+
+.corner-brackets-full > .bracket-bl {
+  bottom: 0;
+  left: 0;
+  border-bottom: 2px solid;
+  border-left: 2px solid;
+}
+
+/* Glow Effects */
+.glow-primary {
+  box-shadow: 0 0 20px var(--color-primary-glow),
+              inset 0 0 20px rgba(124, 58, 237, 0.05);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px var(--color-accent-glow),
+              inset 0 0 20px rgba(34, 211, 238, 0.05);
+}
+
+.text-glow {
+  text-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* Panel Styling */
+.panel {
+  background: linear-gradient(
+    135deg,
+    var(--color-surface) 0%,
+    var(--color-void-light) 100%
+  );
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.panel-inner {
+  background: var(--color-void-light);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+/* Status Indicator */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+}
+
+.status-indicator::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.status-indicator.active::before {
+  background: var(--color-success);
+}
+
+.status-indicator.warning::before {
+  background: var(--color-warning);
+}
+
+.status-indicator.error::before {
+  background: var(--color-danger);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px currentColor;
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 12px currentColor;
+    opacity: 0.7;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-void);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-bright);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* Custom Range Slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--color-surface);
+  border-radius: 3px;
+  outline: none;
+  border: 1px solid var(--color-border);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, var(--color-primary-bright), var(--color-primary));
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--color-primary-glow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 20px var(--color-primary-glow);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, var(--color-primary-bright), var(--color-primary));
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* Input Fields */
+.input-field {
+  background: var(--color-void);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-family: 'Share Tech Mono', monospace;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+
+.input-field::placeholder {
+  color: var(--color-text-dim);
+}
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-bright));
+  color: white;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 30px var(--color-primary-glow);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary-bright);
+  box-shadow: 0 0 20px var(--color-primary-glow);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, #0d9488, var(--color-accent));
+  color: var(--color-void);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-accent:hover:not(:disabled) {
+  box-shadow: 0 0 30px var(--color-accent-glow);
+  transform: translateY(-1px);
+}
+
+/* Label styling */
+.label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* Card Preview Area */
+.card-preview {
+  background: var(--color-void);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  position: relative;
+}
+
+.card-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse at top, rgba(124, 58, 237, 0.1), transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(34, 211, 238, 0.05), transparent 50%);
+  pointer-events: none;
+  border-radius: 6px;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-border-bright),
+    transparent
+  );
+  margin: 1rem 0;
+}
+
+/* Loading Animation */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.scanning::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(124, 58, 237, 0.2),
+    transparent
+  );
+  animation: scan 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Mono Text */
+.mono {
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* Header styling */
+.header-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--color-text), var(--color-primary-bright));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: var(--color-text-muted);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.toggle-switch.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary-bright);
+}
+
+.toggle-switch.active::after {
+  left: 26px;
+  background: white;
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* Decorative elements */
+.tech-line {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--color-primary),
+    var(--color-accent),
+    var(--color-primary)
+  );
+  opacity: 0.6;
+}
+
+.chevron-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 0l10 10-10 10L0 10z' fill='%237c3aed' fill-opacity='0.05'/%3E%3C/svg%3E");
+  background-size: 20px 20px;
+}
