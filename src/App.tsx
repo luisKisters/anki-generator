@@ -118,19 +118,19 @@ const getTemperatureStage = (temp: number): TemperatureStage => {
     return {
       name: "Precise",
       description: "Factual, consistent output",
-      color: "text-cyan-400",
+      color: "text-accent",
     };
   } else if (temp <= 0.5) {
     return {
       name: "Balanced",
       description: "Recommended setting",
-      color: "text-emerald-400",
+      color: "text-primary",
     };
   } else if (temp <= 0.8) {
     return {
       name: "Creative",
       description: "More variety",
-      color: "text-amber-400",
+      color: "text-primary-bright",
     };
   } else {
     return {
@@ -348,7 +348,7 @@ ${text}`;
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="border-b border-primary/30 bg-void-light/80 backdrop-blur-sm"
+        className="border-b border-border bg-void-light/80 backdrop-blur-sm sticky top-0 z-30"
       >
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <motion.div
@@ -368,7 +368,7 @@ ${text}`;
                 repeatDelay: 3,
               }}
             >
-              <Zap className="w-8 h-8 text-primary-bright" />
+              <Zap className="w-8 h-8 text-primary" />
             </motion.div>
             <h1 className="header-title">Anki Generator</h1>
           </motion.div>
@@ -378,9 +378,6 @@ ${text}`;
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <span className="status-indicator active">
-              <span className="mono text-xs">SYSTEM ONLINE</span>
-            </span>
             <motion.button
               onClick={() => setShowSettings(true)}
               className="p-2 text-text-muted hover:text-primary-bright transition-colors"
@@ -394,7 +391,7 @@ ${text}`;
       </motion.header>
 
       {/* Main Content - Two Panel Layout */}
-      <main className="max-w-7xl mx-auto p-6 h-[calc(100vh-73px)]">
+      <main className="max-w-7xl mx-auto p-6 min-h-[calc(100vh-73px)]">
         <motion.div
           className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full"
           variants={containerVariants}
@@ -403,7 +400,7 @@ ${text}`;
         >
           {/* Left Panel - Controls */}
           <motion.div
-            className="panel p-6 flex flex-col corner-brackets"
+            className="panel p-6 flex flex-col scifi-border h-full"
             variants={panelVariants}
           >
             <motion.div
@@ -424,10 +421,8 @@ ${text}`;
                   <motion.button
                     key={type}
                     onClick={() => setCardType(type)}
-                    className={`p-4 rounded border transition-colors ${
-                      cardType === type
-                        ? "border-primary bg-primary/20 text-primary-bright"
-                        : "border-border bg-void hover:border-primary/50 text-text-muted"
+                    className={`p-4 btn-card-type ${
+                      cardType === type ? "active" : ""
                     }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -463,68 +458,60 @@ ${text}`;
                 </motion.button>
               </div>
 
-              <AnimatePresence mode="wait">
-                {!autoCardCount ? (
-                  <motion.div
-                    key="manual"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="flex items-center gap-4"
-                  >
-                    <input
-                      type="range"
-                      min="1"
-                      max="50"
-                      value={cardCountInput}
-                      onChange={(e) =>
-                        setCardCountInput(parseInt(e.target.value))
+              {/* Instant transition (no motion/animate presence for height) per user request */}
+              {!autoCardCount ? (
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={cardCountInput}
+                    onChange={(e) =>
+                      setCardCountInput(parseInt(e.target.value))
+                    }
+                    className="flex-1"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={cardCountInput}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (val >= 1 && val <= 50) {
+                        setCardCountInput(val);
                       }
-                      className="flex-1"
-                    />
-                    <input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={cardCountInput}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        if (val >= 1 && val <= 50) {
-                          setCardCountInput(val);
-                        }
-                      }}
-                      className="input-field w-20 text-center"
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="auto"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="p-3 bg-accent/10 border border-accent/30 rounded text-accent text-sm"
-                  >
-                    <Sparkles className="w-4 h-4 inline mr-2" />
-                    AI will determine optimal card count
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    }}
+                    className="input-field w-20 text-center"
+                  />
+                </div>
+              ) : (
+                <div className="p-3 bg-accent/10 border border-accent/30 text-accent text-sm">
+                  <Sparkles className="w-4 h-4 inline mr-2" />
+                  AI will determine optimal card count
+                </div>
+              )}
             </motion.div>
 
             {/* Temperature */}
             <motion.div className="mb-6" variants={itemVariants}>
               <div className="flex items-center justify-between mb-2">
                 <label className="label mb-0">Creativity</label>
-                <motion.span
-                  key={getTemperatureStage(temperature).name}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`mono text-xs ${
-                    getTemperatureStage(temperature).color
-                  }`}
-                >
-                  {getTemperatureStage(temperature).name}
-                </motion.span>
+                <div className="flex items-center gap-2">
+                  <span className="mono text-xs text-text-muted">
+                    {Math.round(temperature * 10)}/10
+                  </span>
+                  <motion.span
+                    key={getTemperatureStage(temperature).name}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className={`mono text-xs ${
+                      getTemperatureStage(temperature).color
+                    }`}
+                  >
+                    {getTemperatureStage(temperature).name}
+                  </motion.span>
+                </div>
               </div>
               <input
                 type="range"
@@ -537,10 +524,6 @@ ${text}`;
                 }
                 className="w-full"
               />
-              <div className="flex justify-between mt-1">
-                <span className="text-xs text-text-dim">Precise</span>
-                <span className="text-xs text-text-dim">Wild</span>
-              </div>
             </motion.div>
 
             {/* Input Text */}
@@ -584,7 +567,7 @@ ${text}`;
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-sm"
+                  className="mb-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-sm"
                 >
                   {error}
                 </motion.div>
@@ -603,7 +586,7 @@ ${text}`;
                     exit="exit"
                     onClick={() => handleGenerate(false)}
                     disabled={isGenerating || !inputText.trim()}
-                    className="btn-primary w-full flex items-center justify-center gap-2"
+                    className="btn-scifi btn-scifi-primary w-full flex items-center justify-center gap-2"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -626,7 +609,7 @@ ${text}`;
                     <motion.button
                       onClick={() => handleGenerate(true)}
                       disabled={isGenerating}
-                      className="btn-primary flex items-center justify-center gap-2"
+                      className="btn-scifi btn-scifi-primary flex items-center justify-center gap-2"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -639,7 +622,7 @@ ${text}`;
                     </motion.button>
                     <motion.button
                       onClick={handleRestart}
-                      className="btn-secondary flex items-center justify-center gap-2"
+                      className="btn-scifi flex items-center justify-center gap-2"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -654,7 +637,7 @@ ${text}`;
 
           {/* Right Panel - Preview */}
           <motion.div
-            className="panel p-6 flex flex-col corner-brackets"
+            className="panel p-6 flex flex-col scifi-border h-full"
             variants={panelVariants}
           >
             <motion.div
@@ -691,7 +674,7 @@ ${text}`;
                     className="flex-1 flex flex-col"
                   >
                     {/* Card Content */}
-                    <div className="card-preview flex-1 p-6 scan-lines overflow-hidden relative">
+                    <div className="card-preview flex-1 p-6 scan-lines overflow-hidden relative border border-border">
                       <AnimatePresence mode="wait" custom={slideDirection}>
                         <motion.div
                           key={currentCardIndex}
@@ -746,7 +729,7 @@ ${text}`;
                       <motion.button
                         onClick={() => navigateCard(-1)}
                         disabled={currentCardIndex === 0}
-                        className="btn-secondary px-4 py-2 flex items-center gap-2 disabled:opacity-30"
+                        className="btn-scifi px-4 py-2 flex items-center gap-2"
                         whileHover={{ scale: 1.05, x: -2 }}
                         whileTap={{ scale: 0.95 }}
                       >
@@ -762,7 +745,7 @@ ${text}`;
                               setSlideDirection(idx > currentCardIndex ? 1 : -1);
                               setCurrentCardIndex(idx);
                             }}
-                            className={`h-2 rounded-full transition-colors ${
+                            className={`h-2 transition-colors ${
                               idx === currentCardIndex
                                 ? "bg-primary-bright"
                                 : "bg-surface-light hover:bg-primary/50"
@@ -781,7 +764,7 @@ ${text}`;
                         disabled={
                           currentCardIndex === generatedCards.length - 1
                         }
-                        className="btn-secondary px-4 py-2 flex items-center gap-2 disabled:opacity-30"
+                        className="btn-scifi px-4 py-2 flex items-center gap-2"
                         whileHover={{ scale: 1.05, x: 2 }}
                         whileTap={{ scale: 0.95 }}
                       >
@@ -800,12 +783,12 @@ ${text}`;
                   >
                     <div className="text-center text-text-dim">
                       <motion.div
-                        className="w-16 h-16 mx-auto mb-4 rounded-full border-2 border-dashed border-border flex items-center justify-center"
+                        className="w-16 h-16 mx-auto mb-4 border-2 border-dashed border-border flex items-center justify-center rounded-full"
                         animate={{
                           borderColor: [
-                            "rgba(124, 58, 237, 0.3)",
-                            "rgba(124, 58, 237, 0.6)",
-                            "rgba(124, 58, 237, 0.3)",
+                            "rgba(120, 204, 226, 0.3)",
+                            "rgba(120, 204, 226, 0.6)",
+                            "rgba(120, 204, 226, 0.3)",
                           ],
                         }}
                         transition={{
@@ -837,7 +820,7 @@ ${text}`;
                     animate="visible"
                     exit="exit"
                     disabled
-                    className="btn-accent w-full flex items-center justify-center gap-2 opacity-30 cursor-not-allowed"
+                    className="btn-scifi w-full flex items-center justify-center gap-2 opacity-30 cursor-not-allowed"
                   >
                     <Download className="w-5 h-5" />
                     <span>Download CSV</span>
@@ -850,7 +833,7 @@ ${text}`;
                     animate="visible"
                     exit="exit"
                     onClick={downloadCSV}
-                    className="btn-accent w-full flex items-center justify-center gap-2"
+                    className="btn-scifi btn-scifi-primary w-full flex items-center justify-center gap-2"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -868,7 +851,7 @@ ${text}`;
                   >
                     <motion.button
                       onClick={downloadCSV}
-                      className="btn-accent flex items-center justify-center gap-2"
+                      className="btn-scifi btn-scifi-primary flex items-center justify-center gap-2"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -877,7 +860,7 @@ ${text}`;
                     </motion.button>
                     <motion.button
                       onClick={handleRestart}
-                      className="btn-secondary flex items-center justify-center gap-2"
+                      className="btn-scifi flex items-center justify-center gap-2"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -907,7 +890,7 @@ ${text}`;
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="panel p-6 max-w-md w-full corner-brackets"
+              className="panel p-6 max-w-md w-full scifi-border"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-6">
@@ -953,7 +936,7 @@ ${text}`;
 
               <motion.button
                 onClick={() => saveApiKey(apiKey)}
-                className="btn-primary w-full"
+                className="btn-scifi btn-scifi-primary w-full"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 initial={{ opacity: 0, y: 10 }}
@@ -974,7 +957,7 @@ ${text}`;
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-void/50 backdrop-blur-sm flex items-center justify-center z-40 pointer-events-none"
+            className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-40 pointer-events-none"
           >
             <motion.div
               initial={{ scale: 0.8 }}
