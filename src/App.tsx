@@ -181,40 +181,70 @@ function App() {
   };
 
   const generatePrompt = (text: string, type: CardType, changes?: string) => {
-    const count = autoCardCount ? "an appropriate number of" : cardCountInput;
-    const changesSection = changes
-      ? `\n\nUser requested modifications:\n${changes}`
+    const countInstruction = autoCardCount
+      ? "Determine the optimal number of cards based on the content density and complexity. Aim for comprehensive coverage without redundancy (typically 3-20 cards depending on content)."
+      : `Create exactly ${cardCountInput} cards.`;
+
+    const cardTypeInstructions =
+      type === "basic"
+        ? `Card Format (Basic):
+- "front": A clear, specific question that tests one concept
+- "back": A concise, accurate answer
+- Example: {"front": "What is the <b>capital</b> of France?", "back": "<b>Paris</b> - located on the Seine River"}`
+        : `Card Format (Cloze Deletion):
+- "text": A complete sentence with {{c1::hidden term}} syntax
+- Include context clues and hints in parentheses when helpful
+- Example: {"text": "The {{c1::<b>mitochondria</b>}} is the powerhouse of the cell, responsible for {{c2::ATP production}}."}`;
+
+    const modificationsSection = changes
+      ? `
+IMPORTANT - User Modifications Requested:
+${changes}
+Apply these modifications while maintaining card quality. This may involve:
+- Adjusting difficulty level
+- Focusing on specific topics or concepts
+- Changing the style or format of questions
+- Adding more context or examples
+`
       : "";
 
-    const basePrompt = `You are an expert flashcard generator. Create ${count} high-quality Anki flashcards from the provided text.${changesSection}
+    const systemPrompt = `You are an expert educational content creator specializing in spaced repetition flashcards for Anki.
 
-Output ONLY valid JSON in this exact format:
+TASK: Generate high-quality flashcards from the provided source material.
+${modificationsSection}
+OUTPUT FORMAT:
+Return ONLY valid JSON with no additional text, explanations, or markdown code blocks.
+
 {
   "cards": [
-    ${
-      type === "basic"
-        ? '{"front": "Question with <b>key terms</b> highlighted?", "back": "<b>Answer</b> with important details"}'
-        : '{"text": "Example sentence with {{c1::<b>cloze deletion</b>}} for key concept"}'
-    }
+    ${type === "basic" ? '{"front": "...", "back": "..."}' : '{"text": "..."}'}
   ]
 }
 
-Guidelines:
-1. Output ONLY valid JSON - no explanations or markdown
-2. ${autoCardCount ? "Create a realistic number of cards based on content density (typically 3-15)" : `Create exactly ${cardCountInput} cards`}
-3. Match the language of the input text
-4. Focus on practical, memorable content
-5. ${
-      type === "basic"
-        ? "Make questions specific and answers concise"
-        : "Use {{c1::term}} syntax for cloze deletions, include context"
-    }
-6. Use HTML formatting sparingly: <b>bold</b> for key terms, <i>italic</i> for hints
+${cardTypeInstructions}
 
-Input text:
+CARD GENERATION RULES:
+1. ${countInstruction}
+2. Language: Match the language of the source material exactly
+3. Quality Standards:
+   - Each card should test ONE specific concept
+   - Avoid vague or overly broad questions
+   - Include enough context to understand the question
+   - Answers should be accurate and verifiable from the source
+4. HTML Formatting (use sparingly):
+   - <b>bold</b> for key terms and important concepts
+   - <i>italic</i> for hints, translations, or secondary information
+   - Avoid excessive formatting
+5. Content Guidelines:
+   - Prioritize the most important and testable information
+   - Create cards that promote understanding, not just memorization
+   - For technical content, include practical examples when possible
+   - Avoid redundant cards that test the same concept differently
+
+SOURCE MATERIAL:
 ${text}`;
 
-    return basePrompt;
+    return systemPrompt;
   };
 
   const handleGenerate = async (isApplyChanges = false) => {
