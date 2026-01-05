@@ -266,7 +266,7 @@ ${text}`;
       );
 
       const result = await ai.models.generateContent({
-        model: "gemini-3.0-flash-preview",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
           temperature: temperature,
