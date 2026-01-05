@@ -266,7 +266,7 @@ ${text}`;
       );
 
       const result = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.0-flash-preview",
         contents: prompt,
         config: {
           temperature: temperature,
@@ -742,7 +742,9 @@ ${text}`;
                           <motion.button
                             key={idx}
                             onClick={() => {
-                              setSlideDirection(idx > currentCardIndex ? 1 : -1);
+                              setSlideDirection(
+                                idx > currentCardIndex ? 1 : -1
+                              );
                               setCurrentCardIndex(idx);
                             }}
                             className={`h-2 transition-colors ${
